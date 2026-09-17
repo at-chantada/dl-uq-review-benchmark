@@ -26,6 +26,8 @@ The code should mainly be in python, unless there is a good reason to use other 
 
 Given that later on I want to incorporate my method into this benchmark, the code should be made with the capability of adding new methods without need of big refactors.
 
+All relevant files are and should be located in this directory. Even things like AGENTS.md.
+
 # Plan
 
 There is no big hurry to make this. I would like to make this alongside the agents by steps. The rough steps should be planned ahead. That is what this document is for, to starting sketching out the roadmap. A rough idea I have for the roadmap is to start with simple methods like regular ensemble, and MC dropout, and think of which metrics would be the simplest to do first. Then, slowly make things more sophisticated. Add methods like Hamilton Monte Carlo, and repulsive ensembles. And consider more complicated and robust test to compare the methods.
