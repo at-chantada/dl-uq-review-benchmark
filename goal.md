@@ -1,4 +1,4 @@
-# Project brief — working third draft
+# Project brief — working fourth draft
 
 This document records the agreed purpose and scientific scope. Sections marked **proposed** are recommendations for discussion, not settled implementation requirements. The new method's details remain deferred until integration.
 
@@ -58,17 +58,31 @@ The governing equations defining the relations $f$ and $g$ are known. Evaluating
 
 The current extreme upper limit is approximately one to two days (24–48 hours) of cluster runtime per experiment. This is a ceiling, not a target for routine development runs. A later extension to approximately one week may be considered, but is outside the current budget.
 
-The available cluster hardware and allocation are still unspecified. Each experiment specification should state what its budget covers, including methods, tuning, repetitions, and reference calculations. Node or device counts, memory, storage, and aggregate CPU/GPU hours remain to be determined; elapsed runtime alone does not define the total computational allocation.
+Available resources: the current computer was inspected locally on 2026-09-17 using `/etc/os-release`, `uname -r`, `lscpu`, `free -h`, `df -h`, and `lspci -nn`. The additional desktop and cluster specifications were supplied by the user. Available memory and disk space are snapshots to recheck when scheduling work.
+
+| Environment | Resources | Execution arrangement |
+| --- | --- | --- |
+| Current computer | Fedora Linux 44 KDE; kernel 7.2.5-200.fc44.x86_64; AMD Ryzen AI 7 445 with Radeon 840M, 6 cores / 12 threads; approximately 30 GiB RAM total and 24 GiB available at inspection; 8 GiB swap, unused; root/project filesystem approximately 952 GiB total with 914 GiB available; integrated AMD graphics (PCI identifies Krackan2), no discrete/NVIDIA GPU detected | The agent can execute locally |
+| Additional desktop | Fedora Linux 44 KDE; kernel 7.2.5-200.fc44.x86_64; Ryzen 5 5600G, 6 cores / 12 threads, up to 4.47 GHz; 14 GiB RAM and 8 GiB swap; 237 GB root filesystem with approximately 139 GB available; integrated AMD Radeon Vega, no discrete/NVIDIA GPU | Available for agent-run work; establish access and the execution environment when using this machine |
+| Cluster | H200 GPUs, Sapphire Rapids CPUs, and nodes with up to 2000 GB memory; a large pool of resources is available | No agent runs on the cluster. The agent prepares the work and the user schedules the jobs |
+
+The agent should prepare a reproducible cluster job package: the code revision and environment instructions, input/configuration manifest, exact commands, requested CPU/GPU/memory/storage resources, runtime estimate and its basis, restart instructions, and expected output files. Once the scheduler is identified, include a suitable submission script. The user schedules execution and makes the results and logs available for the agent to validate and analyse. Scripts must run unattended, without requiring an agent on the compute node.
+
+Each experiment specification should state what its budget covers, including methods, tuning, repetitions, and reference calculations. Node or device counts and aggregate CPU/GPU hours must be sized for the actual job; elapsed runtime alone does not define the allocation. Both local computers provide a CPU execution baseline, so initial validation and small pilots should not require a discrete GPU. Their memory and free disk space are planning constraints to recheck before substantial runs.
+
+**Proposed budget convention:** the 24–48-hour ceiling covers the complete, predeclared experiment package, including its tuning, repetitions, and reference calculations. Splitting that package into jobs does not reset its allowance. Record queue waiting separately from execution time, and record aggregate resource use as well as elapsed runtime. Confirm the package scope and allocation before scheduling a large run.
 
 **Agreed operating approach:** keep small validation and development runs inexpensive, use pilot timings to size larger comparisons, and save progress so that long experiments can resume after interruption. Report both elapsed runtime and allocated computational resources.
 
 # Literature review
 
-Start with a map of the main approaches to uncertainty quantification in deep learning, then examine methods relevant to the stated regression and inverse problems in greater depth. Clearly distinguish methods covered in the literature review from those implemented in the benchmark; conclusions from these experiments apply to the tested settings.
+The review should be deep and focused on uncertainty quantification for scientific regression, linked observables, inverse problems, and related applications. The four stated problems are priorities, not an exhaustive boundary: similar problems should receive substantive attention where they offer relevant methods, comparisons, or insight. Also explore more distant applications selectively to identify transferable ideas or blind spots. Clearly distinguish methods covered in the literature review from those implemented in the benchmark; conclusions from these experiments apply to the tested settings.
 
-Record search dates and a literature cutoff, search sources and queries, and reasons for including or excluding candidate methods. Include foundational work and relevant recent developments. A method's popularity, scientific relevance, assumptions, availability of an implementation, and computational feasibility should inform selection. The initial map should lead to a justified shortlist rather than a requirement to implement every family.
+Record search dates and a literature cutoff, search sources and queries, and reasons for including or excluding candidate methods. Include foundational work and relevant recent developments. A method's popularity, scientific relevance, assumptions, availability of an implementation, and computational feasibility should inform selection. Reach the final baseline shortlist collaboratively during stage 1, through discussion of the literature as it is explored. Method names elsewhere in this document are candidates, not a predetermined shortlist.
 
 For each selected method, document its inference target, treatment of measurement noise, prior or regularization, supported outputs, computational requirements, and known limitations. Identify the exact variant and implementation used, with citations and any departures from the published algorithm. The specific algorithm behind labels such as "ensemble" or "repulsive ensemble" must be explicit.
+
+Explicitly consider Hamiltonian Monte Carlo inference for Bayesian neural networks (HMC-BNN), including NUTS, among the methods to benchmark. It has two distinct potential roles: a method whose function uncertainty, computational cost, convergence, and limitations are evaluated, and a source of carefully checked numerical posterior references on sufficiently small problems. Its inclusion in the review and candidate comparisons must not be reduced to its reference role.
 
 # Benchmark design
 
@@ -82,7 +96,34 @@ Use three distinct kinds of evidence:
 2. **Numerical posterior references.** For a small neural network, construct an independently checked reference under the same model, prior, and likelihood as the approximation being evaluated. Hamiltonian Monte Carlo is a candidate. Check multiple chains, relevant function summaries, effective sample sizes, Monte Carlo error, and sampler diagnostics; an unresolved reference remains inconclusive. [Vehtari et al.](https://doi.org/10.1214/20-BA1221) provides methodological guidance on MCMC diagnostics.
 3. **Known generating functions.** Use synthetic functions to measure reconstruction accuracy and uncertainty coverage, including controlled challenges to the assumed model. Knowing the generating function does not provide an exact posterior. Real-data examples can follow, with limits on what can be validated made explicit.
 
+When HMC-BNN supplies a reference, distinguish that reference calculation and its budget from ordinary benchmark runs of the method. Do not report a reference run's agreement with itself as evidence of posterior accuracy. Validate the sampler on tractable cases, and use independent reference calculations and diagnostics where feasible, retaining the qualification that numerical references are approximate.
+
 For inverse problems, specify boundary and initial conditions, fixed and inferred quantities, identifiability limitations, and solver tolerances. Check sensitivity to numerical resolution so that solver error can be distinguished from statistical uncertainty. Correct predictions of observables alone do not establish recovery of the latent function.
+
+## Concrete starting experiment — proposed
+
+The following gives a specific interpretation of the previously open choices of generating functions, architecture, prior, reference criteria, tuning, and repetitions. These are provisional defaults to refine during stage 1 and a small pilot, before fixing publication experiments.
+
+| Choice | Proposed starting point |
+| --- | --- |
+| Inputs and evaluation | $x\in[-1,1]$, 25 equally spaced measurement locations including the endpoints, and a fixed 201-point evaluation grid in the same interval |
+| Noise | Initially $\sigma_i=0.1$ for every observation. A first unequal-noise case uses $\sigma_i=0.05+0.1(x_i+1)/2$, supplied to each method |
+| Exact validation problem | $h(x)=\beta_0+\beta_1x+\beta_2x^2$ with independent $\beta_j\sim\mathcal{N}(0,1)$ and the agreed Gaussian likelihood. For a fixed-function example, generate observations from $h_*(x)=0.5-0.7x+0.3x^2$. Compute the exact joint Gaussian posterior over function values |
+| First neural-network problem | Generate observations from $h_*(x)=\sin(\pi x)+0.3x$. Use one scalar input, one hidden layer of 8 tanh units, and one linear output. This small model is for validating comparisons before scaling up |
+| Neural-network prior | Independent zero-mean Gaussian weights with variance $1/n_{\mathrm{in}}$ for a layer with $n_{\mathrm{in}}$ inputs, and unit-variance Gaussian biases. Inspect prior function draws and document any revision before comparing inference methods; this is a candidate prior, not a claim of optimality |
+| Numerical reference pilot | HMC with adaptive trajectory length (NUTS), initially 4 chains, each with 1000 warmup iterations and 1000 retained draws. Extend or revise the run according to diagnostics, accuracy, and budget; draw count alone does not qualify a reference |
+| Tuning pilot | Use separate development datasets, at most 10 candidate configurations per method within a common tuning resource allowance, and validation observations for selection. Freeze the selected settings before final evaluation. Fix the target prior and likelihood for matched-posterior comparisons |
+| Repetition pilot | Start with 5 independent evaluation datasets and 3 training/sampling seeds per approximate method. A reference fit uses multiple chains on each dataset; chains are not independent data replicates. Determine publication repetition counts from pilot variability and the desired precision of comparisons |
+
+For accepting the numerical reference, propose rank-normalized $\widehat R<1.01$, bulk and tail effective sample sizes of at least 400 for the declared function quantities, and Monte Carlo standard errors of function means below 5% of their posterior standard deviations. Require no post-warmup divergences, inspect energy and trajectory diagnostics, and investigate disagreement between chains or parameter diagnostics, including neural-network symmetries. The multiple-chain and convergence checks follow [Stan's diagnostic guidance](https://mc-stan.org/learn-stan/diagnostics-warnings.html); the precision target is a proposed project choice. These checks are necessary evidence, not proof of an exact posterior, and tighter tolerances may be needed for small method differences or tail claims.
+
+For calibration averaged over the Bayesian model, generate functions from the specified prior and then generate noisy observations. Keep that experiment distinct from coverage under the two fixed generating functions above. If the reference cannot be validated within budget, reduce the validation problem or report the affected comparison as unresolved.
+
+## Initial joint-function checks — proposed
+
+Pointwise uncertainty describes $h(x)$ at individual locations. Joint uncertainty also describes how values at different locations vary together. Two methods can give similar pointwise intervals but different uncertainty for an integral or a difference between locations.
+
+Start with a small set of joint checks: preserve coherent function draws over the evaluation grid, compare covariances on a fixed 21-point subgrid, and compare the distributions of $I=\int_{-1}^{1}h(x)\,dx$ and $\Delta=h(0.5)-h(-0.5)$ against the corresponding reference. Check numerical integration by refining the grid. This adds a concrete test of cross-location dependence while leaving simultaneous function bands and more elaborate function summaries for later stages.
 
 ## Comparison rules
 
@@ -136,20 +177,38 @@ The progression from an exact validation problem to a small neural-network compa
 
 There is no rush. Develop the project collaboratively in manageable stages, reviewing the results and revising the next stage before expanding its scope. These phases describe the intended progression, not authorization to begin implementing the entire project during document refinement.
 
+## Gradual method development
+
+Increase method complexity separately from problem complexity. The proposed implementation order is:
+
+| Step | Candidate methods and scope | Condition for expanding |
+| --- | --- | --- |
+| A. Basic neural baselines | Establish ordinary network fitting as a sanity check, then independent ensembles and MC dropout if selected in stage 1 | A small forward-regression comparison with checked outputs, basic metrics, reproducibility, and reports |
+| B. Additional approximate inference | Add simple, clearly specified variants of shortlisted methods, such as Laplace approximations or variational inference, one at a time | Each addition is checked on the same small problems before its comparisons are expanded |
+| C. More demanding methods and variants | Develop HMC-BNN comparisons and selected interacting or repulsive ensembles, with their tuning, diagnostics, and computational costs | Small-case validation and measured cost justify larger or harder experiments |
+
+This is a proposed development sequence; the literature review should refine the order according to the selected variants and implementation effort. A limited HMC-BNN reference run may be introduced after the basic neural baselines work, before completing steps B and C, to support posterior comparisons. Broader HMC-BNN testing and scaling studies follow gradually. The review can examine all candidate families from the outset while code development remains incremental.
+
+For every new method, first demonstrate it on an existing simple benchmark, inspect its results and diagnostics, and then extend it to more difficult problems. Avoid introducing an unvalidated method and a new difficult problem in the same step. Expansion to every method–problem combination is not required; the literature, evidence, and compute budget should guide coverage.
+
+## Project stages
+
 | Stage | Work | Reviewable result |
 | --- | --- | --- |
-| 1. Literature map and protocol | Review method families and select the first problem, baselines, metrics, and compute budget | Cited method map and an explicit first-experiment specification |
-| 2. Exact validation problem | Implement a tractable posterior, core metrics, and provenance; establish report generation | A small validated example with traceable HTML and PDF reports |
-| 3. First neural-network comparison | Add a small network, a checked numerical posterior reference, and a few baselines such as independent ensembles and MC dropout | A complete comparison under the agreed Gaussian noise model, with limitations and reference diagnostics |
-| 4. Broader comparisons | Add justified methods and stress tests, then multiple-observable and inverse problems | Updated reports with repeated experiments, cost comparisons, and documented failure cases |
-| 5. New-method integration | Discuss the new algorithm when I am ready, add it through the method interface, and revisit the closest related work | Comparisons under the established protocol and evidence for the paper's claims |
+| 1. Focused literature review and protocol | Study methods relevant to the priority applications and similar problems in depth, scan more distant areas for blind spots, discuss candidates with the user, and settle the baseline shortlist, implementation order, and first experiment | A cited evidence table covering assumptions, measurement-noise treatment, capabilities, limitations, and implementations; an agreed shortlist and versioned protocol. Record the search cutoff at this stage |
+| 2. Exact validation and reporting | Implement the tractable regression problem, analytic reference, core metrics, function-sample storage, and report generation on a local CPU | Independently checked posterior means and covariances, checks of metrics and joint summaries, and reproducible HTML/PDF reports. Resolve discrepancies before neural-network comparisons |
+| 3. Small neural-network pilot | Establish the simplest agreed neural baselines first, then a limited HMC-BNN numerical reference on the same small problem; measure runtime, memory, tuning sensitivity, and variability | A reference diagnostic report, paired baseline comparisons, and measured estimates for larger runs. Review or simplify unresolved cases; use the pilot to set final settings and repetition counts |
+| 4. Forward-regression comparisons | Introduce the remaining shortlisted methods incrementally, following the method-development sequence; expand validated comparisons to problems 1 and 2, including unequal measurement errors and explicit input dependence | Repeated comparisons of posterior approximation, practical uncertainty, and cost, including HMC-BNN where selected and feasible. Prepare user-submitted cluster packages when local execution is insufficient; validate returned artifacts before updating reports |
+| 5. Inverse-problem comparisons | Introduce problem 3 with a simple known relation, then a known dynamical model and problem 4; state identifiability, boundary/initial conditions, and numerical error checks. Use PINNs only where justified by the problem | Results for the primary unknown functions and associated observables, with validated forward calculations and explicit limitations. Apply the established comparison and provenance protocol |
+| 6. New-method integration | When the user is ready, discuss the algorithm, add it through the method interface, revisit its closest related work, and run matched comparisons and justified ablations | Evidence for its contribution and limitations under the established protocol. This stage can begin after stage 3 once the benchmark is stable; it need not wait for all extensions in stages 4–5 |
+| 7. Paper-supporting experiment release | Refresh the literature search, resolve or label outstanding issues, freeze selected code/configurations/results, and regenerate the reports and reusable figures/tables | An auditable experiment release with reproduction commands, sources, uncertainty on comparisons, and evidence supporting the claims to be used in the paper |
 
-Potential additions after the initial baselines include variational inference, Laplace approximations, and explicitly specified randomized or repulsive ensembles. Their priority should come from the literature review and pilot results. Integration of the new method need not wait for every possible benchmark extension.
+Candidate families for stage 1 include independent ensembles, MC dropout, variational inference, Laplace approximations, HMC/NUTS inference for Bayesian neural networks, and explicitly specified randomized or repulsive ensembles. HMC-BNN is a candidate comparison method as well as a possible numerical reference. The list is illustrative and can change during the review. Each stage ends with a report and discussion that determines the next bounded step; the plan does not require implementing every candidate or every possible stress test.
 
 # Decisions still open
 
-- Cluster hardware and allocation, memory and storage budgets, and the precise experiment scope covered by the 24–48-hour runtime ceiling.
-- The first generating functions, network architecture and prior, numerical reference criteria, tuning protocol, and repetition counts.
-- How much joint function uncertainty to assess in the first comparison, beyond pointwise summaries.
-- The literature cutoff, depth of coverage outside the selected applications, and final baseline shortlist.
-- Detailed staging of the roadmap, building on the agreed reference strategy and benchmark, provenance, and reporting principles.
+- Discuss or revise the concrete starting experiment and initial joint-function checks proposed above. These replace the earlier unspecified requests for functions, architecture, priors, diagnostics, tuning, repetitions, and joint uncertainty.
+- Discuss or revise the detailed seven-stage roadmap, its gradual method-development sequence, and the proposed experiment-package budget convention.
+- Resolve during stage 1: the final baseline shortlist through literature discussions, the recorded literature cutoff, exact metric definitions, and refinements to the initial experiment. The review's depth and application focus are agreed.
+- Resolve after the pilot: publication repetition counts and numerical precision targets, based on observed variability and computational cost.
+- Resolve when preparing cluster work: scheduler and submission conventions, specific resource allocations and package scope, software environment, and transfer of inputs/results. The user schedules cluster jobs; the agent does not run there.
