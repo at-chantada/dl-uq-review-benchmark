@@ -1,6 +1,22 @@
-# Project brief — working fourth draft
+# Deep-learning uncertainty quantification — project brief
 
-This document records the agreed purpose and scientific scope. Sections marked **proposed** are recommendations for discussion, not settled implementation requirements. The new method's details remain deferred until integration.
+This document is the project brief, formerly named `goal.md`. It records the agreed purpose, scientific scope, and working principles. Sections marked **proposed** are recommendations for discussion, not settled implementation requirements. They provide starting points for the literature review and pilots; they do not block the initial literature work. The new method's details remain deferred until integration. Git history records revisions, so the title does not carry a draft number.
+
+# First agentic run
+
+When asked to begin the project, start with a bounded first pass of stage 1: the literature review. This is the first discussion checkpoint within that stage, not a request to complete the entire review or roadmap in one run.
+
+Produce the following project-local artifacts:
+
+- An initial literature memo explaining the relevant method families, their treatment of supplied measurement errors, the function distributions they provide, and their applicability to the priority problems and related applications. Export it to readable HTML and PDF from a shared source, clearly labeled as an initial review.
+- An evidence table with representative foundational and recent primary sources for each initial candidate family, including HMC-BNN, or an explicit record of unresolved coverage. Distinguish evidence for latent-function inference from evidence limited to noisy-observation prediction.
+- A bibliography and search log recording sources, queries, dates, paper versions, access/reading status, and the search cutoff. Identify important missing or inaccessible evidence.
+- A proposed baseline menu with reasons, an implementation order, and recommendations for the first experiment. Present choices and tradeoffs for discussion; the shortlist is settled collaboratively during stage 1.
+- A short `PROGRESS.md` recording completed work, artifact locations, unresolved questions, and the recommended next bounded step.
+
+Use minimal local tooling needed to organize sources and render the report. Benchmark implementation, model training, and cluster execution belong to later steps. The 24–48-hour experiment ceiling is a compute limit for experiments, not a requested duration for this literature pass.
+
+The first run is complete when these artifacts form an inspectable initial comparison, substantive claims have source support or explicit evidence limitations, and a focused set of baseline/protocol decisions can be discussed with the user. Return for that discussion before finalizing the shortlist or starting stage 2. Subsequent literature passes deepen the review in the agreed directions.
 
 # Context
 
@@ -82,6 +98,8 @@ Record search dates and a literature cutoff, search sources and queries, and rea
 
 For each selected method, document its inference target, treatment of measurement noise, prior or regularization, supported outputs, computational requirements, and known limitations. Identify the exact variant and implementation used, with citations and any departures from the published algorithm. The specific algorithm behind labels such as "ensemble" or "repulsive ensemble" must be explicit.
 
+Use survey papers to discover relevant work and primary sources to verify substantive methodological and empirical claims. Read the relevant full-text sections and supplements where available; search snippets and abstracts alone are insufficient to establish detailed claims or method rankings. Record whether a source was read in full, in relevant sections, or only at abstract level, and mark limited-access conclusions as provisional. Preserve DOI or arXiv identifiers, exact versions, publication/preprint status, and section, equation, figure, or table locations supporting the claims. Record code repository revisions when assessing implementations. References already present in this brief are methodological starting points, not a completed literature search.
+
 Explicitly consider Hamiltonian Monte Carlo inference for Bayesian neural networks (HMC-BNN), including NUTS, among the methods to benchmark. It has two distinct potential roles: a method whose function uncertainty, computational cost, convergence, and limitations are evaluated, and a source of carefully checked numerical posterior references on sufficiently small problems. Its inclusion in the review and candidate comparisons must not be reduced to its reference role.
 
 # Benchmark design
@@ -131,7 +149,7 @@ Use the same data realizations, evaluation domains, and available measurement-er
 
 Set tuning budgets and stopping rules explicitly. Keep final evaluation results and synthetic ground truth separate from tuning; use designated development problems or validation data. Freeze and version the protocol for reported comparisons, while labeling exploratory runs separately. Include failed runs and failure rates rather than reporting only successful cases.
 
-Repeat across independently generated datasets and training or sampling seeds. Keep these sources of randomness separate, and use paired comparisons on the same datasets where possible. Report variability across runs and Monte Carlo uncertainty in the metrics. Repetition counts and numerical tolerances should be chosen after a pilot study, within the agreed compute budget.
+Repeat across independently generated datasets and training or sampling seeds. Keep these sources of randomness separate, and use paired comparisons on the same datasets where possible. Report variability across runs and Monte Carlo uncertainty in the metrics; correlated evaluation-grid points and samples from one fitted posterior must not be counted as independent dataset replicates. Repetition counts and numerical tolerances should be chosen after a pilot study, within the agreed compute budget.
 
 Start stress tests by varying data count, measurement-noise scale, unequal error bars, and observation density within the data range. Later stages can investigate harder function shapes and weakly identifiable inverse problems. Extrapolation remains excluded.
 
@@ -165,11 +183,11 @@ Document two reproduction paths: rebuilding the reports from saved results, and 
 
 Use Python primarily, unless there is a clear reason to use another language. Preferred tools are uv, ruff, and pyrefly. Document the code and mathematical assumptions so that I can understand and review the implementation. Document the provenance of calculations, figures, results, and their checks.
 
-Given that later on I want to incorporate my method into this benchmark, the code should be made with the capability of adding new methods without need of big refactors.
+Design the benchmark so that new methods, including mine, can be added without major refactoring.
 
 Initial method interfaces should be based on the requirements of the benchmark and established methods. Any additional requirements specific to my method will be discussed when it is integrated.
 
-All relevant files are and should be located in this directory. Even things like AGENTS.md.
+Keep all project files, including agent instructions, source material records, code, and reports, within this repository.
 
 # Roadmap — proposed
 
@@ -196,7 +214,7 @@ For every new method, first demonstrate it on an existing simple benchmark, insp
 | Stage | Work | Reviewable result |
 | --- | --- | --- |
 | 1. Focused literature review and protocol | Study methods relevant to the priority applications and similar problems in depth, scan more distant areas for blind spots, discuss candidates with the user, and settle the baseline shortlist, implementation order, and first experiment | A cited evidence table covering assumptions, measurement-noise treatment, capabilities, limitations, and implementations; an agreed shortlist and versioned protocol. Record the search cutoff at this stage |
-| 2. Exact validation and reporting | Implement the tractable regression problem, analytic reference, core metrics, function-sample storage, and report generation on a local CPU | Independently checked posterior means and covariances, checks of metrics and joint summaries, and reproducible HTML/PDF reports. Resolve discrepancies before neural-network comparisons |
+| 2. Exact validation and reporting | Implement the tractable regression problem, analytic reference, core metrics, and function-sample storage on a local CPU; extend the literature-report tooling to computed results | Independently checked posterior means and covariances, checks of metrics and joint summaries, and reproducible HTML/PDF reports. Resolve discrepancies before neural-network comparisons |
 | 3. Small neural-network pilot | Establish the simplest agreed neural baselines first, then a limited HMC-BNN numerical reference on the same small problem; measure runtime, memory, tuning sensitivity, and variability | A reference diagnostic report, paired baseline comparisons, and measured estimates for larger runs. Review or simplify unresolved cases; use the pilot to set final settings and repetition counts |
 | 4. Forward-regression comparisons | Introduce the remaining shortlisted methods incrementally, following the method-development sequence; expand validated comparisons to problems 1 and 2, including unequal measurement errors and explicit input dependence | Repeated comparisons of posterior approximation, practical uncertainty, and cost, including HMC-BNN where selected and feasible. Prepare user-submitted cluster packages when local execution is insufficient; validate returned artifacts before updating reports |
 | 5. Inverse-problem comparisons | Introduce problem 3 with a simple known relation, then a known dynamical model and problem 4; state identifiability, boundary/initial conditions, and numerical error checks. Use PINNs only where justified by the problem | Results for the primary unknown functions and associated observables, with validated forward calculations and explicit limitations. Apply the established comparison and provenance protocol |
@@ -206,6 +224,8 @@ For every new method, first demonstrate it on an existing simple benchmark, insp
 Candidate families for stage 1 include independent ensembles, MC dropout, variational inference, Laplace approximations, HMC/NUTS inference for Bayesian neural networks, and explicitly specified randomized or repulsive ensembles. HMC-BNN is a candidate comparison method as well as a possible numerical reference. The list is illustrative and can change during the review. Each stage ends with a report and discussion that determines the next bounded step; the plan does not require implementing every candidate or every possible stress test.
 
 # Decisions still open
+
+None of the following prevents the first literature pass. Resolve each decision when its supporting evidence is available and before the work that depends on it.
 
 - Discuss or revise the concrete starting experiment and initial joint-function checks proposed above. These replace the earlier unspecified requests for functions, architecture, priors, diagnostics, tuning, repetitions, and joint uncertainty.
 - Discuss or revise the detailed seven-stage roadmap, its gradual method-development sequence, and the proposed experiment-package budget convention.
